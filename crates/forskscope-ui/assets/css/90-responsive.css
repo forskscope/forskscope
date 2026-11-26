@@ -87,15 +87,31 @@
      exactly two line-worthy children now (`.tablist`, and the
      Settings/?-holding remainder), and letting `.tabbar` wrap pushed the
      buttons onto their own second line below every tab row — found from
-     actually looking at the screenshot. `.tab-slot` must not shrink here
-     either: `.tab-slot`'s own `overflow: hidden` drops its default
-     flexbox minimum width to 0 (the automatic-minimum-size rule), which
-     is exactly why it shrank to an empty box with no title visible,
-     instead of wrapping, when `.tablist` tried to fit every tab on one
-     line. */
+     actually looking at the screenshot. `.tab-slot` must not shrink to
+     nothing here either: `.tab-slot`'s own `overflow: hidden` drops its
+     default flexbox minimum width to 0 (the automatic-minimum-size
+     rule), which is exactly why it shrank to an empty box with no title
+     visible, instead of wrapping, when `.tablist` tried to fit every tab
+     on one line.
+     Review 246 §1 (handoff 118's re-triage, "tab title over its ×"):
+     `flex-shrink: 0` fixed that collapse by refusing to shrink *at
+     all* - wrapping redistributes tabs across rows, but can't help a
+     single tab (Explorer, the first and only one on its own row, with
+     no close button of its own to offset) that's simply wider than the
+     row's own share once the Settings/Shortcuts buttons beside it have
+     taken theirs; confirmed live, pseudo-language, 200% - Explorer's
+     own title ran 7px into the Shortcuts button beside it, at the one
+     zoom this file's own breakpoint is live at every size the test
+     matrix measures (a 200% webview zoom shrinks the *logical* CSS
+     viewport, not the physical window, well under 720px). `flex-shrink:
+     1` plus an explicit `min-width` - the floor "shrink to nothing"
+     was guarding against, named directly instead of relied on by
+     omission - lets a too-wide tab give back the sliver of width its
+     neighbour needs, with `.tab-title-text`'s own ellipsis (already in
+     place) taking over once it does, rather than painting over it. */
   .tabbar { max-height: none; }
   .tablist { flex-wrap: wrap; overflow: visible; }
-  .tab-slot { flex-shrink: 0; }
+  .tab-slot { flex-shrink: 1; min-width: 6ch; }
   /* The tab list can now grow taller than the buttons (several wrapped
      rows of tabs); `flex-start` keeps the buttons on the tab list's own
      first row instead of following `.tabbar`'s default `align-items:

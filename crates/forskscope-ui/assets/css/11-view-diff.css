@@ -125,7 +125,17 @@
    the vertical scrollbar invisible.  Let min-height be auto (the default). */
 .diff-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 6ch minmax(0, 1fr);
+  /* Review 245 §1.2 / review 246 §1 (handoff 118's re-triage, "the Use
+     column"): a bare `6ch` track hard-capped the act column at
+     exactly English's own "Use ▶" width - any language whose
+     equivalent needs more (confirmed live: the pseudo-language, at
+     100% text size, not just an extreme zoom) spilled the button and
+     its label out over the gutter beside it, since a CSS grid track
+     never shrinks a neighbour to make room for an item overflowing
+     its own. `minmax(6ch, max-content)` keeps English/Japanese at
+     today's exact width (their own content is narrower than 6ch) and
+     grows only when a label genuinely needs it. */
+  grid-template-columns: minmax(0, 1fr) minmax(6ch, max-content) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -203,7 +213,7 @@
   overflow: visible;
 }
 .diff-col-act .diff-col-table {
-  width: 6ch;
+  width: max-content;
   min-width: 6ch;
 }
 
@@ -217,7 +227,8 @@
 /* ---- act cell (table-cell) ---- */
 .diff-act {
   display: table-cell;
-  width: 6ch;
+  width: max-content;
+  min-width: 6ch;
   height: var(--line-h);
   text-align: center;
   vertical-align: middle;

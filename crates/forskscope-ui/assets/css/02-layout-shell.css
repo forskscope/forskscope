@@ -119,7 +119,7 @@ select option { background: var(--surface); color: var(--text); }
   display: flex; align-items: center; gap: .4rem;
   padding: .3rem .7rem; border: 1px solid var(--border);
   border-bottom: none; border-radius: 6px 6px 0 0;
-  background: var(--surface); max-width: 22ch;
+  background: var(--surface); max-width: 22ch; min-width: 0;
   height: 2.2rem; overflow: hidden;
 }
 .tab-slot:has(.tab.active) { background: var(--surface-3); border-color: var(--accent); }
@@ -197,9 +197,14 @@ select option { background: var(--surface); color: var(--text); }
 /* Review 204 §2.2: three different behaviours under pressure, not one -
    the first full fix (review 203) ellipsized every item, and a one- or
    two-character fragment ("U…") said nothing. The rule now:
-   - .pair and .save-target: truncate with an ellipsis, in that priority
-     order (flex-shrink below) - their own text is genuinely too long to
-     ever show in full on a narrow window, so a fragment is still useful.
+   - .pair, .save-target, and .bidi-notice (review 246 §1, handoff 118's
+     re-triage - moved into this category from "whole, or not at all"
+     below, where it overflowed the bar at 125% pseudo-language: its own
+     text "varies with the count" the same way .pair's does, so a
+     fragment is equally useful): truncate with an ellipsis, in that
+     priority order (flex-shrink below) - their own text is genuinely
+     too long to ever show in full on a narrow window, so a fragment is
+     still useful.
    - .enc/.stats/.dirty: never truncate - short, fixed-format, and the
      information itself ("UTF-8", "+2 / -1", "unsaved"); a fragment of
      one of these is actively worse than not showing it at all.
@@ -251,7 +256,7 @@ select option { background: var(--surface); color: var(--text); }
    comparison and mergetool mode): clearly legible, several characters
    plus `…`, with `.save-target` still showing its own shortened form
    alongside it. */
-.statusbar .pair, .statusbar .save-target {
+.statusbar .pair, .statusbar .save-target, .statusbar .bidi-notice {
   text-overflow: ellipsis; min-width: 8ch;
 }
 /* The file-pair label: a much larger flex-shrink factor than .save-target,
@@ -264,11 +269,15 @@ select option { background: var(--surface); color: var(--text); }
 .statusbar .dirty { color: var(--warn); flex-shrink: 0; }
 /* RFC-100 §4: the warning colour is a cue, not the only signal - the
    words themselves say what's there, same reasoning as .dirty above.
-   Unlike .dirty/.enc/.stats (short, fixed-format), this phrase's own
-   length varies with the count - "whole, or not at all" (below), the
-   same category .local-only/.mode-indicator already use, not the
-   never-truncate category these fixed-format items are in. */
-.statusbar .bidi-notice { color: var(--warn); flex-shrink: 0; }
+   Review 246 §1 (handoff 118's re-triage): its own text "varies with
+   the count" the same way .pair's does ("Contains 3 direction-control
+   characters" against a count that can run to two digits), so a
+   pseudo-stretched count message overflowed the bar at 125% where the
+   never-truncate items above never would - `flex-shrink: 10`, the same
+   priority tier as .save-target (behind .pair, which absorbs the
+   squeeze first), with the ellipsis floor above instead of this
+   category's own "whole, or not at all". */
+.statusbar .bidi-notice { color: var(--warn); flex-shrink: 10; }
 .statusbar .stats { color: var(--ok); font-size: 12px; flex-shrink: 0; }
 .statusbar .save-target-no-backup { color: var(--warn); cursor: default; flex-shrink: 0; }
 .local-only { cursor: default; user-select: none; flex-shrink: 0; }

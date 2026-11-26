@@ -136,8 +136,26 @@
   flex: 1 1 auto; min-width: min-content; min-height: 24px;
   display: flex; align-items: center;
 }
-.modal .field > select,
 .modal .field > input { flex-shrink: 0; }
+/* Review 246 §1, `div.field` overflow (handoff 118's re-triage):
+   `flex-shrink: 0` here too (until now) meant a long option's text -
+   "Red-green safe (blue and orange)", "Compact (no spacer rows,
+   default)" - kept the select at its own full content width even
+   after `.modal .field`'s own `flex-wrap` had already sent it to a row
+   of its own below the label (F232's own mechanism, working exactly
+   as designed) - so a pseudo-stretched option, 40% past what English
+   needed, pushed the select past the row it had all to itself.
+   `flex-shrink: 1` (the default, named for clarity) plus `min-width: 0`
+   let it shrink below that floor instead; `overflow: hidden;
+   text-overflow: ellipsis` means a select that does shrink that far
+   reads "Red-green safe (blue an…" rather than silently losing its
+   own right edge - the same remedy this app already gives a long
+   folder name or tab title, applied here to a select showing its own
+   chosen option's text. */
+.modal .field > select {
+  flex-shrink: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis;
+}
 /* RFC-097 stage 3 §6: the field's own help text, visible instead of a
    `title` tooltip - sits right under its `.field` row (its next sibling
    in markup, never a flex child of `.field` itself, so it reads as a full
@@ -250,7 +268,22 @@ kbd.kb-key {
   font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2);
   border: 1px solid var(--border); border-radius: 4px; padding: .1rem .3rem; white-space: nowrap;
 }
-.kb-desc { font-size: 13px; }
+/* Review 246 §1 (handoff 118's re-triage), "the Shortcuts table":
+   `.kb-table`'s own `1fr` column let `.kb-desc` grow, but never gave it
+   `min-width: 0` - a grid item's own automatic minimum size (its
+   longest unbreakable run) otherwise floors it below what the rest of
+   the row's words would gladly wrap around. Word-wrapping itself was
+   already the default (no `white-space: nowrap` was ever declared
+   here); but `min-width: 0` alone still left individual words
+   overflowing their own narrow column at 200% pseudo-language
+   (confirmed live: the *key-combo* column's own `max-content` track
+   takes its full width first, leaving the description as little as
+   89px at this size) - unlike F205/review 232 §1.1's own settings
+   label (a short, load-bearing field name, read at a glance, never
+   this narrow), this is reference prose in a help panel, already
+   wrapping onto several lines here; `overflow-wrap: anywhere` lets the
+   rare word that still doesn't fit break rather than spill. */
+.kb-desc { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
 
 code.path-display {
   display: block; margin: .2rem 0; padding: .25rem .4rem;

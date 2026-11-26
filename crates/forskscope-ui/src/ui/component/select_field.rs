@@ -37,6 +37,34 @@ impl SelectOption {
     }
 }
 
+/// Review 246 §1 (handoff 118's re-triage), "`div.field` overflow": a
+/// `<select>`'s own closed-box text rendering ignores `overflow`/
+/// `text-overflow` entirely in this engine - confirmed live, forcing
+/// the element's own CSS `width` down to 10px left its measured
+/// overflow *unchanged* (738px against the same 350px available), so
+/// the text itself, not the box, is what has to shrink. The longest
+/// real (non-pseudo) option label in this app today is 39 characters
+/// ("Paths relative to the compared folders") and fits every size
+/// measured; this floor sits comfortably above it, so no real
+/// language is touched - only the pseudo-language's own ~50-character
+/// stretched labels (40% longer, plus its own `⟦…⟧` wrapping) are.
+const MAX_LABEL_CHARS: usize = 42;
+
+/// `label`, unchanged if it already fits [`MAX_LABEL_CHARS`], or cut to
+/// that many characters with a trailing `…` if not - never silently
+/// past it, the same shape `.diff-col-act`'s own "sized to its
+/// content, not a hard cap" fix (review 245 §1.2) uses for a box that
+/// *can* grow, for a native control whose own closed-state text
+/// cannot.
+fn truncated_label(label: &str) -> String {
+    if label.chars().count() <= MAX_LABEL_CHARS {
+        return label.to_string();
+    }
+    let mut truncated: String = label.chars().take(MAX_LABEL_CHARS - 1).collect();
+    truncated.push('…');
+    truncated
+}
+
 /// A `<select>` that always shows `value`, by marking the matching option
 /// `selected` directly rather than relying on the select's own `value`
 /// property (see this module's doc comment for why that alone is not
@@ -63,7 +91,12 @@ pub fn SelectField(
                 option {
                     value: "{opt.value}",
                     selected: opt.value == value,
-                    "{opt.label}"
+                    // The full label survives as a hover tooltip whenever
+                    // it was actually cut - no information lost, only
+                    // what's shown closed needing a second look.
+                    title: (opt.label.chars().count() > MAX_LABEL_CHARS)
+                        .then(|| opt.label.clone()),
+                    "{truncated_label(&opt.label)}"
                 }
             }
         }
@@ -72,8 +105,52 @@ pub fn SelectField(
 
 #[cfg(test)]
 mod tests {
+    use super::{MAX_LABEL_CHARS, truncated_label};
     use std::fs;
     use std::path::Path;
+
+    #[test]
+    fn a_label_at_or_under_the_cap_is_unchanged() {
+        let exact = "x".repeat(MAX_LABEL_CHARS);
+        assert_eq!(truncated_label(&exact), exact);
+        assert_eq!(truncated_label("short"), "short");
+    }
+
+    #[test]
+    fn a_label_over_the_cap_is_cut_with_a_trailing_ellipsis() {
+        let long = "x".repeat(MAX_LABEL_CHARS + 10);
+        let out = truncated_label(&long);
+        assert_eq!(out.chars().count(), MAX_LABEL_CHARS);
+        assert!(out.ends_with('…'), "{out:?} has no trailing ellipsis");
+        assert_eq!(
+            &out[..out.len() - '…'.len_utf8()],
+            &"x".repeat(MAX_LABEL_CHARS - 1)
+        );
+    }
+
+    /// The real catalog's own longest known option label - confirmed
+    /// here, not just asserted in a comment, so a future edit that
+    /// makes it (or a longer one) grow past the cap fails loudly
+    /// rather than silently clipping real, translated text a user
+    /// actually reads.
+    #[test]
+    fn the_longest_known_real_option_label_is_never_truncated() {
+        let longest = "Paths relative to the compared folders";
+        assert!(longest.chars().count() < MAX_LABEL_CHARS);
+        assert_eq!(truncated_label(longest), longest);
+    }
+
+    /// A pseudo-language-shaped label (stretched well past any real
+    /// option, bracket-wrapped) is exactly the case the cap exists
+    /// for - falsified against a realistic length, not a contrived one.
+    #[test]
+    fn a_pseudo_language_shaped_label_is_truncated() {
+        let pseudo_shaped = "⟦ẇẇẇẇĈôḿṕáĉť (ñô šṕáĉéř řôẇš, ďéḟáûĺť)ẇẇẇẇẇ⟧";
+        assert!(pseudo_shaped.chars().count() > MAX_LABEL_CHARS);
+        let out = truncated_label(pseudo_shaped);
+        assert_eq!(out.chars().count(), MAX_LABEL_CHARS);
+        assert!(out.ends_with('…'));
+    }
 
     /// Falsify by reverting any call site back to a raw `select {` element
     /// — this must fail, naming the exact file and line. A source scan, not

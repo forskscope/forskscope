@@ -40,7 +40,16 @@
    this shrink to nothing at a short enough window; .deep-compare's own
    scroll above takes over instead when even that doesn't fit. */
 .deep-table { flex: 1; overflow: auto; min-height: calc(6 * var(--row-h)); }
-.deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
+/* Review 246 §1 (handoff 118's re-triage), "the status cell": `flex-wrap:
+   wrap` - the selected row's own three action buttons (`.deep-actions`,
+   `flex-shrink: 0`, never give back their own width - they're words,
+   kept for the same reason the Use column's are) can genuinely not fit
+   beside `.deep-cell` at all at 200% pseudo-language, even once the
+   fix above gives `.deep-cell` every pixel it can spare; wrapping them
+   to their own row, same shape `.deep-compare-toolbar` already uses
+   for its own button row above, costs only height, which this row
+   (no fixed height of its own) already has to give. */
+.deep-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
 /* RFC-097 stage 3 §3: the Explorer's own selected-row treatment
    (03-components.css's `.tree-row.selected`) - same tint, same leading
@@ -52,8 +61,41 @@
 }
 .deep-row:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
 .deep-cell { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; }
-.deep-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
-.deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* `flex-wrap: wrap` here too: even alone on its own row (the wrap on
+   `.deep-row` above), the three buttons together can still be wider
+   than the row itself at 200% pseudo-language - the third one (`Copy
+   to left`) ran off the window's own edge otherwise, confirmed live.
+   That alone did nothing until `flex-shrink: 0` (below) also went -
+   it kept `.deep-actions`'s own outer box exactly as wide as its three
+   buttons unwrapped, on principle, regardless of the line's own
+   available width, which is exactly what a box must *not* do for its
+   own `flex-wrap` to ever have a narrower box to wrap within. Nothing
+   here depends on it refusing to shrink - the row's own wrap (above)
+   already keeps it off `.deep-cell`'s line whenever there isn't room
+   for both; letting the box itself size down to whatever's actually
+   available is what lets its three buttons wrap in turn when even
+   that isn't enough. */
+.deep-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+/* Review 246 §1 (handoff 118's re-triage), "the status cell": neither
+   of `.deep-cell`'s own two text children (below) gave its own
+   `min-width: 0`, so each kept its own content-based automatic
+   minimum as a floor no amount of shrinking could cross - with the
+   selected row's own `.deep-actions` (three buttons, `flex-shrink: 0`,
+   never give back any of their own width) claiming most of a narrow
+   row at 175-200% pseudo-language, `.deep-cell` had nowhere left to
+   shrink into and overflowed instead. The status glyph itself
+   (`.dir-status`) is the one thing here that must never be the one to
+   give way - `flex-shrink: 0` guarantees it its own small, fixed
+   width regardless; `.deep-path`'s existing ellipsis and `.dir-size`'s
+   new one (its own format, "1.2 KB", can still run long enough to
+   matter at this zoom) are what actually shrink, in that order, same
+   priority shape as the status bar's own `.pair`/`.save-target`. */
+.dir-status { flex-shrink: 0; }
+.dir-size {
+  flex-shrink: 10; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.deep-path { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* F216: font-size 11px -> 12px. RFC-097 stage 3 §3: no longer hover-only -
    these only render on the selected row at all (`DeepRow`'s own
    `is_selected` gate), so there is no resting-vs-hover state left to
