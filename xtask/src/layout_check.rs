@@ -39,12 +39,7 @@ use std::time::{Duration, Instant};
 /// resize after launch.
 const DEFAULT_WINDOWS: &[&str] = &["1000x700", "800x560", "1366x768"];
 const DEFAULT_TEXT_SIZES: &[u32] = &[100, 125, 150, 175, 200];
-/// RFC-101 stage C (handoff 118 §2): `"pseudo"` joins the layout row as
-/// a third language - 3 windows × 5 text sizes × 3 languages × the
-/// views, not the contrast row (`write_contrast_plan`'s own hardcoded
-/// `["en"]`, unchanged: contrast checks don't read text at all, so a
-/// pseudo pass there would measure nothing new).
-const DEFAULT_LANGUAGES: &[&str] = &["en", "ja", "pseudo"];
+const DEFAULT_LANGUAGES: &[&str] = &["en", "ja"];
 
 /// Rendered contrast's own two layouts (RFC-098 §3): side by side at
 /// the listing's own size, and stacked - "where elements appear and

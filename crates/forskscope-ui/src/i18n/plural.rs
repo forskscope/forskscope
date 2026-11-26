@@ -33,16 +33,6 @@ pub(crate) fn category(lang: Lang, count: i64) -> &'static str {
         // ("1 件一致" / "3 件一致" are identical today, correctly, because
         // Japanese genuinely has only one plural form).
         Lang::Ja => "other",
-        // Handoff 118 §1: "the pseudo-language uses English's rule" -
-        // literally English's own, not a stand-in.
-        #[cfg(feature = "layout-probe")]
-        Lang::Pseudo => {
-            if count == 1 {
-                "one"
-            } else {
-                "other"
-            }
-        }
     }
 }
 
@@ -70,18 +60,6 @@ mod tests {
     fn japanese_is_always_other() {
         for n in [0, 1, 2, 3, 5, 10, 11, 100, 1_000_000] {
             assert_eq!(category(Lang::Ja, n), "other", "n = {n}");
-        }
-    }
-
-    // Handoff 118 §1: "the pseudo-language uses English's rule" -
-    // same shape as `english_one_is_exactly_1`/`english_other_...`
-    // above, against `Lang::Pseudo` instead.
-    #[test]
-    #[cfg(feature = "layout-probe")]
-    fn pseudo_uses_englishs_own_rule() {
-        assert_eq!(category(Lang::Pseudo, 1), "one");
-        for n in [0, 2, 3, 4, 5, 10, 11, 21, 100, 1_000_000] {
-            assert_eq!(category(Lang::Pseudo, n), "other", "n = {n}");
         }
     }
 }

@@ -279,12 +279,6 @@ pub(crate) fn lv(l: Lang) -> &'static str {
     match l {
         Lang::En => "en",
         Lang::Ja => "ja",
-        // Never actually reached: the Settings dialog's own language
-        // `<select>` offers only "en"/"ja" (a hardcoded two-option
-        // list, not driven by `Lang`'s own variants), so this value is
-        // never read back from it.
-        #[cfg(feature = "layout-probe")]
-        Lang::Pseudo => "pseudo",
     }
 }
 pub(crate) fn lf(s: &str) -> Lang {
