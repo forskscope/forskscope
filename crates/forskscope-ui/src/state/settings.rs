@@ -282,6 +282,17 @@ pub fn resolved_contrast_css_class(
 pub enum Lang {
     En,
     Ja,
+    /// RFC-101 stage C (handoff 118): a test-only pseudo-language,
+    /// generated from the English catalog at runtime — never a stored
+    /// catalog file (which `build.rs`'s own id-parity assert and `cargo
+    /// xtask i18n`'s `required_forms` would both pick up unconditionally,
+    /// feature or no feature) and never offered in the Settings
+    /// dialog's own hardcoded two-option language list. The variant
+    /// itself only exists in a `layout-probe` build, so a release
+    /// build's own exhaustive `match`es on `Lang` stay two-armed with
+    /// nothing to gate at runtime.
+    #[cfg(feature = "layout-probe")]
+    Pseudo,
 }
 
 // Re-export for UI use without depending on the core type directly.
@@ -552,6 +563,14 @@ impl AppSettings {
             language: match self.language {
                 Lang::En => LocaleId::english(),
                 Lang::Ja => LocaleId::japanese(),
+                // Never actually reached: the layout-probe's own matrix
+                // loop (`layout_probe.rs`) writes `store.settings`
+                // directly and never calls `persist()` with `Pseudo`
+                // live, so this is never on a real path to disk - a
+                // deliberately unmistakable id, not `"en"`/`"ja"`,
+                // should that ever change.
+                #[cfg(feature = "layout-probe")]
+                Lang::Pseudo => LocaleId("x-pseudo".to_string()),
             },
             diff_font_size: self.diff_font_size,
             diff_font_family: match self.diff_font_family {
