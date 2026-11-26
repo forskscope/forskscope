@@ -403,7 +403,7 @@ fn start_tier1_walk(
     mut tier1_map: Signal<Tier1Map>,
     tier1_epoch: Signal<DigestEpoch>,
     mut trigger: Signal<Tier1Trigger<PathBuf>>,
-    mut announcement: Signal<String>,
+    announcement: Signal<String>,
 ) {
     let key = Tier1Key {
         left_root: l_root.clone(),
@@ -442,8 +442,24 @@ fn start_tier1_walk(
         // Completion is announced, not silently swapped in (§6): a polite live
         // region, `role="status"`, present in the Explorer at all times.
         let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, true);
-        announcement.set(format!("{}: {}", short_name(&rel), label));
+        announce_tier_result(announcement, format!("{}: {}", short_name(&rel), label)).await;
     });
+}
+
+/// RFC-102 §3 shape (F242, handoff 121 — review of the Windows
+/// measurement's own 0-of-3 result for the Explorer's region, the
+/// previous "always mounted, set directly" shape): cleared, then set
+/// after a real tick, mirroring `app.rs`'s own `PassiveLiveRegion`
+/// exactly — a region updated in place with no intervening clear is the
+/// shape that measurement found unreliable; clear-then-set is the one
+/// `app.rs`'s own passive notice already measured 3 of 3 for. Shared by
+/// all three call sites that write into the Explorer's own
+/// `tier1_announcement` (tier 1, tier-2 directory verify, tier-2 file
+/// verify) so the fix lives in one place, not three copies of it.
+async fn announce_tier_result(mut announcement: Signal<String>, text: String) {
+    announcement.set(String::new());
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    announcement.set(text);
 }
 
 /// What a tier-2 directory verdict maps to as rendered evidence — the
@@ -490,7 +506,7 @@ fn start_tier2_dir_verify(
     lang: crate::state::Lang,
     mut tier1_map: Signal<Tier1Map>,
     tier1_epoch: Signal<DigestEpoch>,
-    mut announcement: Signal<String>,
+    announcement: Signal<String>,
 ) {
     let key = Tier1Key {
         left_root: l_root.clone(),
@@ -529,7 +545,7 @@ fn start_tier2_dir_verify(
         // (handoff 060 §5.5: "tier 1 added the live region, so announce
         // into it").
         let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, true);
-        announcement.set(format!("{}: {}", short_name(&rel), label));
+        announce_tier_result(announcement, format!("{}: {}", short_name(&rel), label)).await;
     });
 }
 
@@ -549,7 +565,7 @@ fn start_tier2_file_verify(
     lang: crate::state::Lang,
     mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
     tier1_epoch: Signal<DigestEpoch>,
-    mut announcement: Signal<String>,
+    announcement: Signal<String>,
 ) {
     let key = DigestKey::Common(rel.clone());
     digest_map
@@ -583,7 +599,7 @@ fn start_tier2_file_verify(
             &tier1_epoch.read(),
         );
         let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, false);
-        announcement.set(format!("{}: {}", short_name(&rel), label));
+        announce_tier_result(announcement, format!("{}: {}", short_name(&rel), label)).await;
     });
 }
 
