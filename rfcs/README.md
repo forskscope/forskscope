@@ -195,6 +195,18 @@ RFC design decisions. This list is every file under `handoffs/`.
 - [RFC-084 patch conformance (handoff 024)](./handoffs/084-patch-export-conformance/024-rfc084-patch-conformance.md)
 - [RFC-085 XLSX resumption (handoff 022)](./handoffs/085-spreadsheet-comparison-resumption/022-rfc085-xlsx-resumption.md)
 - [RFC-086 stable hunk identity (handoff 025)](./handoffs/086-stable-hunk-identity/025-rfc086-stable-hunk-identity.md)
+- [RFC-089 *Settings* at the end of the tab bar (handoff 105)](./handoffs/089-one-bar-at-the-top/105-rfc089-settings-at-the-end-of-the-bar.md)
+- [RFC-097 stage 1, text size (handoff 095)](./handoffs/097-readable-for-everyone/095-rfc097-stage-1-text-size.md)
+- [RFC-097 stage 3, visible controls (handoff 097)](./handoffs/097-readable-for-everyone/097-rfc097-stage-3-visible-controls.md)
+- [RFC-097 stage 2, theme, contrast and motion (handoff 098)](./handoffs/097-readable-for-everyone/098-rfc097-stage-2-theme-contrast-motion.md)
+- [RFC-098 layout checks in CI (handoff 101)](./handoffs/098-layout-checks-in-ci/101-rfc098-layout-checks.md)
+- [RFC-099 quieter controls (handoff 103)](./handoffs/099-quieter-controls-and-ignore-lists/103-rfc099-quieter-controls.md)
+- [RFC-100 bidirectional text (handoff 108)](./handoffs/100-bidirectional-text-in-diffs/108-rfc100-bidirectional-text.md)
+- [RFC-101 stage A, measurement (handoff 110)](./handoffs/101-translation-groundwork/110-rfc101-stage-a-measure.md)
+- [RFC-101 stage B, catalogs (handoff 114)](./handoffs/101-translation-groundwork/114-rfc101-stage-b-catalogs.md)
+- [RFC-101 stage C, the pseudo-language (handoff 118)](./handoffs/101-translation-groundwork/118-rfc101-stage-c-pseudo-language.md)
+- [RFC-102 stage A, the list and Windows (handoff 115)](./handoffs/102-messages-that-need-attention-are-heard/115-rfc102-stage-a.md)
+- [RFC-102 stage B, focus and the live region (handoff 116)](./handoffs/102-messages-that-need-attention-are-heard/116-rfc102-stage-b.md)
 
 Only current, reviewed, implementation-useful companion documents for an RFC
 belong here, and each directory corresponds to an existing RFC number (RFC-000
