@@ -1414,7 +1414,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
 | 095 | After `0.195.0`; stage 1 (screen readers in the sandbox) is a gate | ForskScope as a Flatpak on Flathub: home folder access required, no network permission, the owner writes the manifest — **accepted 2026-10-21**; stage 1 passed (review 185); stage 2 done on `main` (review 189), shipping in `0.196.0`; **stage 3, the Flathub submission, deferred by the owner (2026-10-22)** so the one program ships first |
-| 101 | Stages A–B done (stage B in `0.201.0`); stage C in `0.202.0`, first | Translation groundwork: whole-sentence messages with named placeholders, CLDR plurals, one catalog file per language (format measured first), a pseudo-language in RFC-098's layout matrix, and the language policy — **accepted 2026-11-21** |
+| 101 | Stages A–C done (C in `0.202.0`, reviews 245–248); moves to `done/` at the `0.202.0` cut | Translation groundwork: whole-sentence messages with named placeholders, CLDR plurals, one catalog file per language (format measured first), a pseudo-language in RFC-098's layout matrix, and the language policy — **accepted 2026-11-21** |
 | 025 | Slice 8 | Editor adapter prototype and kill-switch |
 | 026 | Post-slice-3 | Cross-platform WebView compatibility |
 | 030 | Post-slice-5 | User documentation and onboarding |
