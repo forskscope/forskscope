@@ -162,8 +162,10 @@ WebKitGTK doesn't send the accessibility event any form of live region
 depends on, so Orca stays silent for these. **On Windows, success and
 information notices are announced** while ForskScope is the active
 window (measured with the shipped app through UI Automation, three runs
-out of three); the search count, the Explorer's status and the ignore
-lists haven't been measured on Windows separately.
+out of three); **the search count and the ignore list are announced too,
+measured the same way** (three runs out of three each). The Explorer's
+status uses its own region as well; confirming it on Windows is still in
+progress.
 Measured with WebKitGTK 2.54.3 and Orca 51.2.
 
 Until a WebKitGTK release changes this, passive notices on Linux are
