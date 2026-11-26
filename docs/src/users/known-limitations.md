@@ -153,21 +153,17 @@ An error or a warning always takes keyboard focus when it appears, so a
 screen reader speaks it on every platform, Linux included — this is not
 the limitation below.
 
-**A success or an informational notice stays passive** (search counts,
-the Explorer's status, a change to an ignore list, "Large file — inline
-diff disabled."): ForskScope announces it through one permanent,
-screen-reader-only live region, the standard way to have a screen reader
-read text that appears without moving focus. On Linux, WebKitGTK doesn't
-send the accessibility event any form of live region depends on, so Orca
-stays silent for these specifically. **On Windows, the same region is
-designed to announce them reliably** (measured through UI Automation on
-a focused test page, three shapes tried: only a region cleared then
-updated in place fires consistently — the one this region uses).
-**Confirming that through the shipped app itself, not just the test
-page, is still in progress** — a `windows-latest` GitHub Actions run
-built to do exactly that could not establish a clean read of keyboard
-focus on that runner's own non-interactive desktop session, so neither
-a pass nor a fail came of it; this note will be updated once it does.
+**Messages that don't need your attention stay passive:** a success or
+informational notice (such as "Large file — inline diff disabled."), the
+number of search matches, the Explorer's status, and a change to an
+ignore list. They're marked as live regions, the standard way to have a
+screen reader read text that appears without moving focus. On Linux,
+WebKitGTK doesn't send the accessibility event any form of live region
+depends on, so Orca stays silent for these. **On Windows, success and
+information notices are announced** while ForskScope is the active
+window (measured with the shipped app through UI Automation, three runs
+out of three); the search count, the Explorer's status and the ignore
+lists haven't been measured on Windows separately.
 Measured with WebKitGTK 2.54.3 and Orca 51.2.
 
 Until a WebKitGTK release changes this, passive notices on Linux are

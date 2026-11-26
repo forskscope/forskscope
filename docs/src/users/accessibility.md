@@ -83,8 +83,10 @@ so you can keep typing or navigating right through one. **Not yet on
 Linux:** the web engine ForskScope uses there (WebKitGTK) doesn't pass
 the accessibility event any form of that region needs, so Orca stays
 silent for these specifically — focus-taking messages are unaffected.
-**On Windows, the same region is designed to announce them,** confirmed
-reliable on a focused test page; confirming it with the shipped app
-itself is still in progress. Measured with WebKitGTK 2.54.3 and Orca
+**On Windows, success and information notices are spoken** while
+ForskScope is the active window, which it is whenever you're working in
+it (measured with the shipped app through UI Automation, three runs out
+of three). The search-match count and the Explorer's status use their
+own regions and haven't been measured on Windows separately. Measured with WebKitGTK 2.54.3 and Orca
 51.2; see
 [Known limitations](known-limitations.md#linux-passive-notices-arent-spoken-by-screen-readers).
