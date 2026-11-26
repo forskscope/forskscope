@@ -163,9 +163,10 @@ depends on, so Orca stays silent for these. **On Windows, success and
 information notices are announced** while ForskScope is the active
 window (measured with the shipped app through UI Automation, three runs
 out of three); **the search count and the ignore list are announced too,
-measured the same way** (three runs out of three each). The Explorer's
-status uses its own region as well; confirming it on Windows is still in
-progress.
+measured the same way** (three runs out of three each). **The Explorer's
+status, measured the same way, was not announced on Windows in three
+runs out of three** — moving it to the same region shape the others use
+(cleared, then set) didn't change that, and the reason isn't known yet.
 Measured with WebKitGTK 2.54.3 and Orca 51.2.
 
 Until a WebKitGTK release changes this, passive notices on Linux are

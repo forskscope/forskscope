@@ -87,8 +87,9 @@ silent for these specifically — focus-taking messages are unaffected.
 ForskScope is the active window, which it is whenever you're working in
 it (measured with the shipped app through UI Automation, three runs out
 of three). **The search-match count and a change to an ignore list are
-spoken too, measured the same way** (three runs out of three each). The
-Explorer's status uses its own region as well; confirming it on Windows
-is still in progress. Measured with WebKitGTK 2.54.3 and Orca
+spoken too, measured the same way** (three runs out of three each). **The Explorer's status, measured the same way, was not
+announced on Windows in three runs out of three** — moving it to the
+same region shape the others use didn't change that, and the reason
+isn't known yet. Measured with WebKitGTK 2.54.3 and Orca
 51.2; see
 [Known limitations](known-limitations.md#linux-passive-notices-arent-spoken-by-screen-readers).
