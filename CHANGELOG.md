@@ -5,7 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.201.1] — Unreleased
+## [0.202.0] — 2026-11-26
+
+**Ready for more languages, and shown as it is.**
+
+### Changed
+
+- **Every screen now holds longer translations.** The diff's *Use*
+  column grows with its word instead of spilling over; long tab titles
+  end in "…" instead of running into the button beside them; the status
+  bar's notice shortens with "…"; Deep Compare's rows let the file path
+  give way and wrap their buttons; the keyboard reference wraps its
+  descriptions. English and Japanese look as before.
+- **New screenshots** in the README and the Linux listing, showing the
+  app as it is today.
+- **The guide says what Windows screen readers announce:** success and
+  information notices are spoken while ForskScope is the active window,
+  measured with the app itself.
+
+### Internal
+
+- **A test-only pseudo-language** (accented, 40 % longer, bracketed)
+  joins the layout check on every push, so a longer translation can't
+  break a screen unnoticed (RFC-101 stage C).
+- **A drop-down option in a real language is never cut:** a test fails
+  if one exceeds the length the app can show in full.
+
 
 ## [0.201.0] — 2026-11-26
 

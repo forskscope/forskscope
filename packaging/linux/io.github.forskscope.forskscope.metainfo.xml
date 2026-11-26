@@ -44,22 +44,27 @@
   <screenshots>
     <screenshot type="default">
       <caption>The two-pane Explorer, browsing a folder to compare.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/explorer.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.202.0/packaging/linux/screenshots/explorer.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two files, with every changed line highlighted.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/file-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.202.0/packaging/linux/screenshots/file-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two folders recursively.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/folder-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.202.0/packaging/linux/screenshots/folder-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>An exported HTML comparison report.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/html-report.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.202.0/packaging/linux/screenshots/html-report.png</image>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.202.0" date="2026-11-26">
+      <description>
+        <p>Every screen holds longer translations, and the screenshots show the app as it is today.</p>
+      </description>
+    </release>
     <release version="0.201.0" date="2026-11-26">
       <description>
         <p>Errors and warnings are spoken by screen readers, every message reads as a whole sentence in English and Japanese, and the path bar keeps the current folder in view.</p>

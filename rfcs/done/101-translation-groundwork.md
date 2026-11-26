@@ -1,6 +1,6 @@
 # RFC 101: Translation Groundwork — Whole Sentences, Plurals, Catalogs and a Pseudo-Language
 
-**Status.** Accepted. Stages A and B implemented (stage B in `0.201.0`, handoff 114; reviews 238–240); stage C in `0.202.0`.
+**Status.** Implemented: stage A in the `0.200.0` cycle, stage B in `0.201.0`, stage C in `0.202.0` (handoffs 110, 114, 118; reviews 232–248).
 **Proposed.** 2026-11-21 by the architect. The owner asked whether to add
 right-to-left support and more languages, weighing maintenance cost
 against usability. The answer:
