@@ -639,11 +639,15 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
         }
     };
 
+    let mut window_size_px: Option<(f64, f64)> = None;
     if let Some(size) = &plan.window_size {
         match parse_window_size(size) {
-            Some((w, h)) => desktop
-                .window
-                .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w, h)),
+            Some((w, h)) => {
+                desktop
+                    .window
+                    .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w, h));
+                window_size_px = Some((w, h));
+            }
             None => eprintln!(
                 "layout-probe: window_size {size:?} is not \"WxH\" - window left at its launch size"
             ),
@@ -698,7 +702,29 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
                 last_text_size_applied = Some(text_size);
                 Some(read_client_width().await)
             };
+            // F243: logged every time, not only on the combinations that
+            // go on to fail - the baseline (no-failure) timing is what a
+            // failing one needs to be read against.
+            eprintln!(
+                "layout-probe: text_size write -> {} (before_zoom_width={:?}) at {:?}",
+                text_size,
+                before_zoom_width,
+                std::time::Instant::now()
+            );
             store.settings.write().text_size = text_size;
+            // F243: the actual fix. `before_zoom_width` is `Some` on
+            // exactly the renders where a real zoom change is due - the
+            // same condition `apply_zoom_with_retry` needs to decide
+            // whether retrying even applies here.
+            if let Some(before) = before_zoom_width {
+                apply_zoom_with_retry(
+                    &desktop,
+                    f64::from(text_size) / 100.0,
+                    before,
+                    window_size_px,
+                )
+                .await;
+            }
             for language in &plan.languages {
                 store.settings.write().language = parse_lang(language);
                 for theme in &plan.themes {
@@ -1136,6 +1162,97 @@ async fn read_client_width() -> f64 {
     }
 }
 
+/// F243 (handoff 124): the actual root cause of "zoom from 800 never
+/// applied", found live with this round's own `waitForZoomChange`
+/// trace (`measurement_script`): `clientWidth` sat at its exact
+/// pre-zoom value for the *entire* wait, at a steady ~60fps the whole
+/// time (`frames` close to `SETTLE_TIMEOUT_MS / 16.7`, never stalled,
+/// never slow) - ruling out "too short a deadline" directly, the
+/// opposite of what a merely-slow reflow would show. `wry`'s own
+/// WebKitGTK `zoom()` (`wry-0.53.5/src/webkitgtk/mod.rs`) cannot itself
+/// fail or report one - `self.webview.set_zoom_level(scale_factor);
+/// Ok(())`, unconditionally - so there is nothing on our own side to
+/// retry *reading*; the underlying `webkit_web_view_set_zoom_level()`
+/// call is, occasionally, simply never acted on by WebKitGTK at all for
+/// this one case. Every historical occurrence (reviews 223, 244, 248,
+/// reply 206c, and this round's own reproduction) reports "800" and
+/// only "800": `800 / 1.25 = 640`, the one width/zoom pair in the whole
+/// matrix that crosses `90-responsive.css`'s own `max-width: 719px`
+/// breakpoint (`1000 / 1.25 = 800`, `1366 / 1.25 = 1092.8`, both still
+/// above it) - a real, specific, falsifiable correlation (not every
+/// window's own first zoom step, which would hit this equally often if
+/// the cause were merely "early in a fresh process's life"), consistent
+/// with the breakpoint's own extra style recalculation occasionally
+/// colliding with WebKitGTK's internal zoom-application path and
+/// dropping it. Reproduced locally at roughly 1 in 15 fresh launches of
+/// exactly this transition (2 of 30, a narrowed repro - window 800x560,
+/// text sizes 100→125 only, see the reply for the full count and the
+/// narrowed harness).
+///
+/// Two escalating nudges were tried and measured, live, before this one
+/// (both against the same 60-run narrowed repro - window 800x560, text
+/// sizes 100→125 - see the reply for the counts): calling
+/// `set_zoom_level(zoom)` again with the *identical* value never helped
+/// (9 of 9 retried runs still failed afterward); calling it with a
+/// perturbed value first (`zoom * 0.999`, then the real target, to
+/// defeat a same-value-is-a-no-op guard inside WebKitGTK's own setter)
+/// didn't help either (9 of 9 again). Both ruled out *re-asserting the
+/// zoom property itself* as a workable fix - whatever is actually stuck
+/// isn't "WebKitGTK forgot to re-run layout for this property write",
+/// since asking it to re-run that exact write, however phrased, changes
+/// nothing. This version nudges the *window size* instead - a real,
+/// independent `tao`/GTK resize (one logical pixel narrower, then back),
+/// a different code path from the zoom setter entirely, forcing a real
+/// top-level relayout that isn't gated on whatever internal zoom-state
+/// comparison the two zoom-based attempts above couldn't get past.
+async fn apply_zoom_with_retry(
+    desktop: &dioxus_desktop::DesktopContext,
+    zoom: f64,
+    before_width: f64,
+    window_size_px: Option<(f64, f64)>,
+) {
+    const POLL_MS: u64 = 250;
+    const RETRY_AFTER_MS: u64 = 900;
+    // One resize nudge recovered only 2 of 6 stuck runs in a 60-run
+    // batch (confirmed live) - raised from 2000 so a stuck combination
+    // gets several nudges, not one, before this function gives up and
+    // leaves it to `measurement_script`'s own wait.
+    const GIVE_UP_AFTER_MS: u64 = 4000;
+    let start = std::time::Instant::now();
+    let mut last_retry = start;
+    loop {
+        let w = read_client_width().await;
+        if w != before_width {
+            return;
+        }
+        let elapsed = start.elapsed();
+        if elapsed >= std::time::Duration::from_millis(GIVE_UP_AFTER_MS) {
+            // Leaves it to `measurement_script`'s own `waitForZoomChange`
+            // to report the probe error, with its own full timeout - not
+            // reported here, so a combination that recovers on its own
+            // after this function gives up still measures normally.
+            return;
+        }
+        if last_retry.elapsed() >= std::time::Duration::from_millis(RETRY_AFTER_MS) {
+            eprintln!(
+                "layout-probe: zoom stuck at {before_width} after {:?}, nudging via a window resize",
+                elapsed
+            );
+            if let Some((w, h)) = window_size_px {
+                desktop
+                    .window
+                    .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w - 1.0, h));
+                desktop
+                    .window
+                    .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w, h));
+            }
+            desktop.set_zoom_level(zoom);
+            last_retry = std::time::Instant::now();
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+    }
+}
+
 /// Runs `script` for its side effect only, retried the same way
 /// [`retry_recv`] is (a fresh `document::eval` each attempt, since a
 /// failed one's own `GenerationalBox` is gone) — shared by the
@@ -1484,13 +1601,34 @@ fn measurement_script(
   // view that's still showing the *previous* combination's layout. A
   // silent `resolve()` either way, the previous shape, let that exact
   // failure through disguised as a passing measurement.
+  // F243 (handoff 124): returns a diagnostic object, not a bare boolean -
+  // `ok` is what every caller before this round read as the whole
+  // result; `trace` (sampled at most every 100ms, not every frame, so a
+  // failing 5s wait doesn't log hundreds of identical entries) and
+  // `frames` are new, read only by the caller's own error path, to tell
+  // apart "never moved at all" from "moved late" and to catch a window
+  // that was never visible/focused for this whole wait.
   function waitForZoomChange(beforeWidth, timeoutMs) {{
     return new Promise((resolve) => {{
-      if (beforeWidth === null) {{ resolve(true); return; }}
-      const deadline = performance.now() + timeoutMs;
+      if (beforeWidth === null) {{ resolve({{ok: true, trace: [], frames: 0}}); return; }}
+      const t0 = performance.now();
+      const deadline = t0 + timeoutMs;
+      const trace = [{{t: 0, w: document.documentElement.clientWidth,
+                       dpr: window.devicePixelRatio, ow: window.outerWidth, iw: window.innerWidth,
+                       visible: document.visibilityState, focused: document.hasFocus()}}];
+      let lastSampleT = 0;
+      let frames = 0;
       function tick() {{
-        if (document.documentElement.clientWidth !== beforeWidth) {{ resolve(true); return; }}
-        if (performance.now() > deadline) {{ resolve(false); return; }}
+        frames += 1;
+        const now = performance.now();
+        const w = document.documentElement.clientWidth;
+        if (w !== beforeWidth) {{ resolve({{ok: true, trace, frames}}); return; }}
+        if (now - lastSampleT >= 100) {{
+          lastSampleT = now;
+          trace.push({{t: now - t0, w, dpr: window.devicePixelRatio, ow: window.outerWidth,
+                       iw: window.innerWidth, visible: document.visibilityState, focused: document.hasFocus()}});
+        }}
+        if (now > deadline) {{ resolve({{ok: false, trace, frames}}); return; }}
         requestAnimationFrame(tick);
       }}
       requestAnimationFrame(tick);
@@ -1687,11 +1825,12 @@ fn measurement_script(
     try {{
     const t0 = performance.now();
     const beforeZoomWidth = {before_zoom_width_js};
-    const zoomChanged = await waitForZoomChange(beforeZoomWidth, {SETTLE_TIMEOUT_MS});
-    if (!zoomChanged) {{
+    const zoomWait = await waitForZoomChange(beforeZoomWidth, {SETTLE_TIMEOUT_MS});
+    if (!zoomWait.ok) {{
       dioxus.send(JSON.stringify({{
         settled: false, settle_ms: performance.now() - t0, overflow: [], clipped: [],
-        error: 'zoom from ' + beforeZoomWidth + ' never applied (text size {text_size}%)',
+        error: 'zoom from ' + beforeZoomWidth + ' never applied (text size {text_size}%)'
+          + ' frames=' + zoomWait.frames + ' trace=' + JSON.stringify(zoomWait.trace),
       }}));
       return;
     }}

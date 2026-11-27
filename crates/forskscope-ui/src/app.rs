@@ -253,6 +253,20 @@ pub fn App() -> Element {
     {
         let text_size = store.settings.read().text_size;
         if *last_text_size.borrow() != text_size {
+            // F243 (handoff 124): logged only under `layout-probe`, never
+            // in a release - confirms the call this render makes, and
+            // when, against the JS side's own `waitForZoomChange` trace
+            // (`layout_probe.rs`'s `measurement_script`), to tell apart
+            // "never called" from "called, but slow to apply" from "the
+            // render never ran in time".
+            #[cfg(feature = "layout-probe")]
+            eprintln!(
+                "layout-probe: set_zoom_level({}) for text_size {} -> {} at {:?}",
+                f64::from(text_size) / 100.0,
+                *last_text_size.borrow(),
+                text_size,
+                std::time::Instant::now()
+            );
             desktop.set_zoom_level(f64::from(text_size) / 100.0);
             *last_text_size.borrow_mut() = text_size;
         }
