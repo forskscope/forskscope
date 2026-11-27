@@ -163,7 +163,7 @@ jobs:
           echo "AUR currently carries: $AUR_VERSION"
           echo "Latest published release: $LATEST_TAG"
           if [ "$AUR_VERSION" != "$LATEST_TAG" ]; then
-            echo "::error::the AUR package (forskscope $AUR_VERSION) is behind the latest release ($LATEST_TAG) - dispatch aur-publish.yml with mode=release, tag=$LATEST_TAG to catch it up"
+            echo "::error::the AUR package (forskscope $AUR_VERSION) is behind the latest release ($LATEST_TAG) - dispatch aur-publish.yml with tag=$LATEST_TAG to catch it up"
             exit 1
           fi
           echo "AUR is current with the latest release."

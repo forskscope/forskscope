@@ -13,34 +13,32 @@ name: AUR Publish
 # is a person's own event and always starts a run, so this restores
 # validation together with approval, on the same action.
 #
-# Two ways in, both now reached through `workflow_dispatch`'s `mode` input
-# (RFC-081 Q3's chosen design: automation never writes pkgver/pkgrel - it
-# only refuses to publish a wrong one):
+# Amended 2026-11-27 (F176, handoff 126): the recipe-fix path is
+# retired. Release - a new upstream version, `tag` naming the published
+# release - is the only path now. It compared `main`'s own checked-out
+# PKGBUILD against the AUR's, but `main`'s pkgver moves to the next
+# version in the post-release bump commit, minutes after every tag, so
+# between releases - the only time a recipe fix would be needed - it
+# always refused (5 of 5 real runs, all rehearsals, all refused). See
+# RFC-081's own *Q3 - amended 2026-11-27* for the full reasoning. A
+# packaging-only fix now ships as a patch release instead.
 #
-#   mode: release      - a new upstream version. `tag` must name the
-#     published release. Requires that tag's checked-out PKGBUILD's
-#     pkgver to equal it and pkgrel to be 1.
-#   mode: recipe-fix (default) - a packaging-only fix with no new
-#     upstream release (e.g. F81's missing `depends`). Requires pkgver to
-#     still equal what the AUR currently carries and pkgrel to be
-#     strictly greater than the AUR's. `tag` is not used.
+# RFC-081 Q3's own design is otherwise unchanged: automation never
+# writes pkgver/pkgrel - it only refuses to publish a wrong one. `tag`
+# must name the published release; its checked-out PKGBUILD's pkgver
+# must equal it and pkgrel must be 1.
 #
 # `dry_run` (default true) runs every validation step and stops before the
-# push, in either mode - it is the only way to rehearse this workflow
-# without touching the real AUR, and shares every step with the real path;
-# only the final push is skipped.
+# push - it is the only way to rehearse this workflow without touching
+# the real AUR, and shares every step with the real path; only the final
+# push is skipped.
 
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: "release (a published tag) or recipe-fix (packaging-only, no new upstream version)"
-        type: choice
-        options: [recipe-fix, release]
-        default: recipe-fix
       tag:
-        description: "Released tag to publish, e.g. 0.175.0 (release mode only)"
-        required: false
+        description: "Released tag to publish, e.g. 0.175.0"
+        required: true
       dry_run:
         description: "Validate and build only - never push to the AUR"
         type: boolean
@@ -76,28 +74,14 @@ jobs:
       target_pkgver: ${{ steps.prepare.outputs.target_pkgver }}
       target_pkgrel: ${{ steps.prepare.outputs.target_pkgrel }}
     steps:
-      - name: Determine mode
-        id: plan
-        run: |
-          MODE="${{ github.event.inputs.mode }}"
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          if [ "$MODE" = "release" ] && [ -z "${{ github.event.inputs.tag }}" ]; then
-            echo "::error::mode=release requires the tag input (the published release to publish)"
-            exit 1
-          fi
-
-      # The release path must read the PKGBUILD as it existed at the
-      # tagged commit, not main's current HEAD - main normally moves to
-      # the next (unreleased) version within minutes of the tag being
-      # pushed (the post-release bump), long before the owner dispatches
-      # this workflow for it.
+      # The checkout must read the PKGBUILD as it existed at the tagged
+      # commit, not main's current HEAD - main normally moves to the
+      # next (unreleased) version within minutes of the tag being pushed
+      # (the post-release bump), long before the owner dispatches this
+      # workflow for it.
       - uses: actions/checkout@v7
-        if: steps.plan.outputs.mode == 'release'
         with:
           ref: ${{ github.event.inputs.tag }}
-
-      - uses: actions/checkout@v7
-        if: steps.plan.outputs.mode == 'recipe-fix'
 
       # A fresh `useradd -m` user has no sudo rights, so `makepkg
       # --syncdeps` could not install anything missing itself. Pre-install
@@ -129,7 +113,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag }}
         run: |
-          bash packaging/linux/aur-publish.sh "${{ steps.plan.outputs.mode }}" "$GITHUB_WORKSPACE/aur-work"
+          bash packaging/linux/aur-publish.sh "$GITHUB_WORKSPACE/aur-work"
           PREPARED="$GITHUB_WORKSPACE/aur-work/PKGBUILD"
           {
             echo "target_pkgver=$(awk -F= '/^pkgver=/{print $2; exit}' "$PREPARED")"

@@ -285,7 +285,7 @@ What that means for a maintainer:
    (F147/F158, handoff 061):
 
    ```sh
-   gh workflow run aur-publish.yml -f mode=release -f tag=${VER} -f dry_run=false
+   gh workflow run aur-publish.yml -f tag=${VER} -f dry_run=false
    ```
 
    **Rehearse first if in doubt**: the same command with `dry_run=true` (the
@@ -482,28 +482,19 @@ What that means for a maintainer:
 
 ## A packaging-only fix, with no new release
 
-Bumping `pkgrel` — for a `PKGBUILD` change that does not need a new upstream
-version, exactly F81's `xdotool` fix — uses the same `aur-publish.yml`
-dispatch as step 5 above, with a different `mode`: `recipe-fix`, which is also
-the input's default, so it needs no flag of its own. Run it once the
-`pkgrel` bump is committed to `main`:
+**There is no between-release path for this any more** (F176; RFC-081
+amended 2026-11-27). `aur-publish.yml` used to offer a `recipe-fix` mode
+for exactly this, but it compared `main`'s own checked-out `PKGBUILD`
+against the AUR's, and `main`'s `pkgver` moves to the next version in
+the post-release bump commit within minutes of every tag — so between
+releases, the only time a recipe fix would be needed, it always
+refused. All 5 real runs ever made were rehearsals, all 5 refused at
+validation; the one packaging-only fix this project has ever needed
+(F81's missing `xdotool` `depends`) predated the mode and simply rode
+along with the next regular release instead.
 
-```sh
-gh workflow run aur-publish.yml -f dry_run=false
-```
-
-It runs every check `mode=release` does, against `main`'s current
-`PKGBUILD` — except `pkgver` must equal what the AUR **already** carries (a
-recipe fix never changes the upstream version; cut a release instead if it
-does), and `pkgrel` must be strictly greater than the AUR's. Automation never
-writes either value — only a human commit does, and the workflow's only job is
-to refuse a wrong one (RFC-081 Q3).
-
-**Rehearse first if in doubt**: `gh workflow run aur-publish.yml -f
-dry_run=true` (the default — omitting `-f dry_run` does this) runs the
-identical build, install, and `namcap` checks and stops before the push. It is
-the same code path with one fewer step, not a separate one that could pass
-while the real path fails.
+**A packaging-only fix now ships as a patch release**, through step 5
+above, the one path that is validated and works.
 
 ## Resubmitting to the Store, with no new release
 

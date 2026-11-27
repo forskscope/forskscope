@@ -486,7 +486,7 @@ jobs:
             echo "world:"
             echo
             echo "\`\`\`sh"
-            echo "gh workflow run aur-publish.yml -f mode=release -f tag=${VER} -f dry_run=false"
+            echo "gh workflow run aur-publish.yml -f tag=${VER} -f dry_run=false"
             echo "gh workflow run store-submit.yml -f tag=${VER} -f dry_run=false"
             echo "\`\`\`"
             echo

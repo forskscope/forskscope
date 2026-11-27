@@ -2,33 +2,36 @@
 # RFC-081: prepare a real, verified PKGBUILD for AUR publication.
 #
 # This script only ever writes into $WORK_DIR - it never touches the AUR
-# and never commits to this repository. It is the one place both trigger
-# paths (a GitHub release, or an owner-dispatched recipe fix) and both
-# push modes (real, dry-run) share code: the workflow's validation steps
-# (makepkg, pacman -U, namcap, .SRCINFO) run identically afterwards in all
-# four combinations, and only the final push step differs.
+# and never commits to this repository. It is the one place the
+# workflow's own validation (makepkg, pacman -U, namcap, .SRCINFO) and
+# the push step share code; only the final push step differs (real,
+# dry-run).
 #
-# Usage: aur-publish.sh <release|recipe-fix> <work-dir>
-#   release:    $RELEASE_TAG must be set - the tag the GitHub release
-#               was published against. Requires pkgver == $RELEASE_TAG
-#               and pkgrel == 1 (a new upstream version, first packaging).
-#   recipe-fix: requires pkgver == the AUR's currently published pkgver
-#               (no source change - a packaging-only fix) and pkgrel
-#               strictly greater than the AUR's (RFC-081 Q3: automation
-#               never writes a version component, only refuses a wrong
-#               one).
+# Usage: aur-publish.sh <work-dir>
+#   $RELEASE_TAG must be set - the tag the GitHub release was published
+#   against. Requires pkgver == $RELEASE_TAG and pkgrel == 1 (a new
+#   upstream version, first packaging).
 #
-# Reads packaging/linux/PKGBUILD from the current checkout (the release
-# path's caller must have checked out the released tag, not main - see
-# the workflow). Writes the real PKGBUILD (SKIP replaced with a computed
+# Amended 2026-11-27 (F176, handoff 126): the recipe-fix path is
+# retired - it compared `main`'s own checked-out PKGBUILD against the
+# AUR's, but `main`'s pkgver moves to the next version in the
+# post-release bump commit, minutes after every tag, so between
+# releases - the only time a recipe fix would be needed - it always
+# refused (5 of 5 real runs, all rehearsals, all refused). A
+# packaging-only fix now ships as a patch release instead, through the
+# one path that is validated and works. See RFC-081's own *Q3 - amended
+# 2026-11-27* for the full reasoning.
+#
+# Reads packaging/linux/PKGBUILD from the current checkout (the
+# caller must have checked out the released tag, not main - see the
+# workflow). Writes the real PKGBUILD (SKIP replaced with a computed
 # hash) to $WORK_DIR/PKGBUILD, and leaves $WORK_DIR/aur-current holding
 # what the AUR repository carries right now, for the workflow's later
 # no-op check.
 
 set -euo pipefail
 
-MODE="${1:?usage: aur-publish.sh <release|recipe-fix> <work-dir>}"
-WORK_DIR="${2:?usage: aur-publish.sh <release|recipe-fix> <work-dir>}"
+WORK_DIR="${1:?usage: aur-publish.sh <work-dir>}"
 REPO_PKGBUILD="packaging/linux/PKGBUILD"
 AUR_HTTPS_URL="https://aur.archlinux.org/forskscope.git"
 
@@ -50,38 +53,20 @@ REPO_PKGVER="$(awk -F= '/^pkgver=/{print $2; exit}' "$REPO_PKGBUILD")"
 REPO_PKGREL="$(awk -F= '/^pkgrel=/{print $2; exit}' "$REPO_PKGBUILD")"
 echo "Checked-out PKGBUILD has pkgver=$REPO_PKGVER pkgrel=$REPO_PKGREL"
 
-# ── Verify version rules for the mode. Automation never *writes* a
-#    version component - it only refuses to publish a wrong one
-#    (RFC-081 Q3: "Automation never writes a version component. pkgver
-#    and pkgrel both come from a human commit; automation verifies them
-#    and refuses to publish when they are wrong.") ─────────────────────
-case "$MODE" in
-release)
-    : "${RELEASE_TAG:?release mode requires RELEASE_TAG}"
-    if [ "$REPO_PKGVER" != "$RELEASE_TAG" ]; then
-        echo "::error::PKGBUILD pkgver ($REPO_PKGVER) does not match the released tag ($RELEASE_TAG)"
-        exit 1
-    fi
-    if [ "$REPO_PKGREL" != "1" ]; then
-        echo "::error::a new release must publish pkgrel=1 (a first packaging of this version), found pkgrel=$REPO_PKGREL"
-        exit 1
-    fi
-    ;;
-recipe-fix)
-    if [ "$REPO_PKGVER" != "$AUR_PKGVER" ]; then
-        echo "::error::a recipe fix must not change pkgver (checked out: $REPO_PKGVER, AUR: $AUR_PKGVER) - cut a release instead"
-        exit 1
-    fi
-    if ! [ "$REPO_PKGREL" -gt "$AUR_PKGREL" ] 2>/dev/null; then
-        echo "::error::a recipe fix must increase pkgrel (checked out: $REPO_PKGREL, AUR: $AUR_PKGREL)"
-        exit 1
-    fi
-    ;;
-*)
-    echo "::error::unknown mode: $MODE (expected release or recipe-fix)"
+# ── Verify version rules. Automation never *writes* a version
+#    component - it only refuses to publish a wrong one (RFC-081 Q3:
+#    "Automation never writes a version component. pkgver and pkgrel
+#    both come from a human commit; automation verifies them and
+#    refuses to publish when they are wrong.") ─────────────────────────
+: "${RELEASE_TAG:?RELEASE_TAG must be set}"
+if [ "$REPO_PKGVER" != "$RELEASE_TAG" ]; then
+    echo "::error::PKGBUILD pkgver ($REPO_PKGVER) does not match the released tag ($RELEASE_TAG)"
     exit 1
-    ;;
-esac
+fi
+if [ "$REPO_PKGREL" != "1" ]; then
+    echo "::error::a new release must publish pkgrel=1 (a first packaging of this version), found pkgrel=$REPO_PKGREL"
+    exit 1
+fi
 
 TARGET_PKGVER="$REPO_PKGVER"
 
@@ -113,4 +98,4 @@ if ! grep -qF "sha256sums=('${HASH}')" "$WORK_DIR/PKGBUILD"; then
     exit 1
 fi
 
-echo "Prepared $WORK_DIR/PKGBUILD (mode=$MODE, pkgver=$TARGET_PKGVER, pkgrel=$REPO_PKGREL)"
+echo "Prepared $WORK_DIR/PKGBUILD (pkgver=$TARGET_PKGVER, pkgrel=$REPO_PKGREL)"
