@@ -1174,12 +1174,7 @@ fn launch_and_wait_with_zoom_relaunch(
     let stuck_pairs: Vec<(String, u64)> = rows
         .iter()
         .filter(|r| r.get("zoom_check").and_then(|v| v.as_str()) == Some("needs_relaunch"))
-        .map(|r| {
-            (
-                row_str(r, "view").to_string(),
-                row_u64(r, "text_size"),
-            )
-        })
+        .map(|r| (row_str(r, "view").to_string(), row_u64(r, "text_size")))
         .collect();
     if stuck_pairs.is_empty() {
         return (elapsed, rows);
