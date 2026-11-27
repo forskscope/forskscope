@@ -191,6 +191,7 @@ RFC design decisions. This list is every file under `handoffs/`.
 - [RFC-080 file row size cap (handoff 056)](./handoffs/080-explorer-tiered-directory-comparison/056-file-row-size-cap.md)
 - [RFC-080 tier 2 (handoff 060)](./handoffs/080-explorer-tiered-directory-comparison/060-rfc080-tier2.md)
 - [RFC-081 AUR publication automation (handoff 029)](./handoffs/081-aur-publication-automation/029-rfc081-aur-publication-automation.md)
+- [RFC-081 amended: retire the recipe-fix path (handoff 126)](./handoffs/081-aur-publication-automation/126-rfc081-retire-recipe-fix.md)
 - [RFC-083 encoding breadth (handoff 023)](./handoffs/083-text-encoding-breadth/023-rfc083-encoding-breadth.md)
 - [RFC-084 patch conformance (handoff 024)](./handoffs/084-patch-export-conformance/024-rfc084-patch-conformance.md)
 - [RFC-085 XLSX resumption (handoff 022)](./handoffs/085-spreadsheet-comparison-resumption/022-rfc085-xlsx-resumption.md)

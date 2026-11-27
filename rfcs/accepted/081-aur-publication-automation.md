@@ -24,6 +24,9 @@ works on an Arch-family system, so building the package locally before pushing
 automation removes it. Q1 closed: the
 owner confirms maintainer rights are intact and the AUR account configuration is
 unchanged since `0.22.13`. Stays in `proposed/` until implemented.
+**Amended.** 2026-11-27 by the owner (F176; reply 211, review 251): **the
+recipe-fix path (Q3's Option C, second row) is retired.** Release is the
+only path. See *Q3 — amended 2026-11-27*.
 **Tracks.** Release pipeline; Linux distribution; credential handling.
 **Touches.** `packaging/linux/PKGBUILD`, a new publish workflow, `release.md`,
 `installation.md`, the threat model.
@@ -310,6 +313,28 @@ exist.
 re-requesting invites a review that Option A does not need.
 
 ### Q3 — `pkgrel` policy, and the gap it exposes
+
+> **Amended 2026-11-27 (F176): the recipe-fix path is retired; Option A
+> now applies.**
+> - **It never ran as designed.** It compares `main`'s `PKGBUILD` with
+>   the AUR's, but `main`'s `pkgver` moves to the next version in the
+>   post-release commit, minutes after each tag. So between releases,
+>   the only time a recipe fix is needed, it always refuses. **All 5
+>   runs ever made were rehearsals, and all 5 were refused at
+>   validation.**
+> - **The one recipe-only fix the project has needed (F81, `b8163c0`)
+>   came before the path existed,** and reached users with the next
+>   release, days later.
+> - **The cost that ruled Option A out has gone.** A release no longer
+>   drags an evidence cycle behind it: `0.199.0` to `0.202.0` shipped
+>   within a week, each verified in minutes. **A packaging-only fix now
+>   ships as a patch release,** through the release path that is
+>   validated and works.
+> - **The rule stands:** automation never writes a version component,
+>   and verifies before it publishes. **`dry_run` still defaults to
+>   true.**
+>
+> The text below is the original reasoning, kept as the record.
 
 **Why there are two version fields at all**, since the question came up and will
 come up again.
