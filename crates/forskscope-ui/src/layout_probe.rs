@@ -549,6 +549,22 @@ pub struct ResultRow {
     /// `.path-segments[data-full-path]`. No allowance.
     #[serde(default)]
     pub seed_not_applied: Vec<Measurement>,
+    /// Review 253 §1: the outcome of this `(view, text_size)` pair's own
+    /// zoom-application check, exactly once per pair (the first row
+    /// under it in the plan's own iteration order — every other row
+    /// under the same pair carries `None`, so a sum across the whole
+    /// run double-counts nothing, the same property [`recv_retries`]
+    /// already has). One of `"verified"` (held on the first read, no
+    /// retry needed), `"recovered_by_reapply"` (needed the nudge loop,
+    /// recovered within this launch's own budget) or
+    /// `"needs_relaunch"` (still stuck when the budget ran out — `xtask`
+    /// relaunches once for this exact `(view, text_size)` pair; see
+    /// `error` on this same row for the marker that a relaunch is
+    /// owed). `None` for a row whose own text size was already applied
+    /// under an earlier view (`last_text_size_applied`) — nothing to
+    /// check again.
+    #[serde(default)]
+    pub zoom_check: Option<String>,
 }
 
 fn parse_lang(s: &str) -> Lang {
@@ -712,18 +728,77 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
                 std::time::Instant::now()
             );
             store.settings.write().text_size = text_size;
-            // F243: the actual fix. `before_zoom_width` is `Some` on
+            // F243/review 253 §1: `before_zoom_width` is `Some` on
             // exactly the renders where a real zoom change is due - the
-            // same condition `apply_zoom_with_retry` needs to decide
-            // whether retrying even applies here.
+            // same condition `verify_zoom` needs to decide whether
+            // checking even applies here. Its own result is reported
+            // (`zoom_check`) on exactly one row below - `Some` here,
+            // `None` on every other row under this same pair, so a sum
+            // across the whole run double-counts nothing.
+            let mut zoom_check: Option<String> = None;
             if let Some(before) = before_zoom_width {
-                apply_zoom_with_retry(
+                let outcome = verify_zoom(
                     &desktop,
                     f64::from(text_size) / 100.0,
                     before,
                     window_size_px,
                 )
                 .await;
+                zoom_check = Some(outcome.as_str().to_string());
+                if outcome == ZoomOutcome::StillStuck {
+                    // Review 253 §1: "never measure at an unverified
+                    // zoom" - every row under this `(view, text_size)`
+                    // pair would be measuring the view at the *old*
+                    // size, silently, which is the exact stale
+                    // measurement `SETTLE_TIMEOUT_MS` exists to catch
+                    // and `4ad1478`'s own flicker false positive let
+                    // through. One marker row stands in for the whole
+                    // pair; `xtask` relaunches once for it (its own
+                    // `error` here is what tells `xtask` which pair).
+                    let marker = ResultRow {
+                        view: view.name().to_string(),
+                        text_size,
+                        language: String::new(),
+                        theme: String::new(),
+                        contrast: String::new(),
+                        colour_vision: String::new(),
+                        window_size: plan.window_size.clone(),
+                        settled: false,
+                        settle_ms: 0.0,
+                        probe_ms: 0.0,
+                        recv_retries: 0,
+                        overflow: Vec::new(),
+                        clipped: Vec::new(),
+                        off_screen: Vec::new(),
+                        hit_area: Vec::new(),
+                        small_text: Vec::new(),
+                        rendered_contrast: Vec::new(),
+                        label_placement: Vec::new(),
+                        dialog_occlusion: Vec::new(),
+                        overlap: Vec::new(),
+                        error: Some(format!(
+                            "zoom from {before} never applied, even after the in-process \
+                             reapply budget (text size {text_size}%) - needs a relaunch"
+                        )),
+                        toast_check: ToastCheck::default(),
+                        current_folder_clipped: Vec::new(),
+                        overflow_button_mismatch: Vec::new(),
+                        shallow_path_shifted: Vec::new(),
+                        seed_not_applied: Vec::new(),
+                        zoom_check,
+                    };
+                    match serde_json::to_string(&marker) {
+                        Ok(line) => {
+                            if let Err(e) = writeln!(results_file, "{line}") {
+                                eprintln!("layout-probe: could not write the zoom marker row: {e}");
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("layout-probe: could not serialize the zoom marker row: {e}")
+                        }
+                    }
+                    continue;
+                }
             }
             for language in &plan.languages {
                 store.settings.write().language = parse_lang(language);
@@ -744,6 +819,7 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
                                 colour_vision,
                                 plan.window_size.clone(),
                                 before_zoom_width,
+                                zoom_check.take(),
                             )
                             .await;
                             let line = match serde_json::to_string(&row) {
@@ -986,6 +1062,7 @@ async fn measure_one(
     colour_vision: &str,
     window_size: Option<String>,
     before_zoom_width: Option<f64>,
+    zoom_check: Option<String>,
 ) -> ResultRow {
     // A `store.settings.write()` just before this call schedules a
     // re-render; Dioxus flushes it on this same async executor's own
@@ -1060,6 +1137,7 @@ async fn measure_one(
                 overflow_button_mismatch: Vec::new(),
                 shallow_path_shifted: Vec::new(),
                 seed_not_applied: Vec::new(),
+                zoom_check,
             };
         }
     };
@@ -1092,6 +1170,7 @@ async fn measure_one(
             overflow_button_mismatch: m.overflow_button_mismatch,
             shallow_path_shifted: m.shallow_path_shifted,
             seed_not_applied: m.seed_not_applied,
+            zoom_check,
         },
         Err(e) => ResultRow {
             view: view.name().to_string(),
@@ -1120,6 +1199,7 @@ async fn measure_one(
             overflow_button_mismatch: Vec::new(),
             shallow_path_shifted: Vec::new(),
             seed_not_applied: Vec::new(),
+            zoom_check,
         },
     }
 }
@@ -1205,33 +1285,60 @@ async fn read_client_width() -> f64 {
 /// a different code path from the zoom setter entirely, forcing a real
 /// top-level relayout that isn't gated on whatever internal zoom-state
 /// comparison the two zoom-based attempts above couldn't get past.
-async fn apply_zoom_with_retry(
+///
+/// Review 253 §1 (handoff 125 round 2): this used to just `return` once
+/// `clientWidth` read as anything other than `before_width`, on a
+/// single read - a false positive once a nudge exists at all, found
+/// live reviewing reply 213: the nudge above is a real window resize,
+/// and `clientWidth` can read a transient, in-flight value for a
+/// single tick while it's happening, with the real zoom never actually
+/// landing once the window settles back. So a changed width now has to
+/// hold for two reads, [`HOLD_MS`] apart, before this counts as
+/// verified - [`width_changed_and_held`]'s own job. The product-side
+/// remedy this was modeled on (handoff 125 round 1, `zoom_remedy.rs`)
+/// doesn't land on `main` - see reply 213 - but the nudge mechanism it
+/// proved out is still the right *probe* tactic (review 253 §1's own
+/// words): it just can no longer silently stand in for the product fix
+/// on the measurement side, which is what [`ZoomOutcome::StillStuck`]
+/// and `run`'s own "never measure at an unverified zoom" handling of it
+/// are for.
+async fn verify_zoom(
     desktop: &dioxus_desktop::DesktopContext,
     zoom: f64,
     before_width: f64,
     window_size_px: Option<(f64, f64)>,
-) {
+) -> ZoomOutcome {
     const POLL_MS: u64 = 250;
     const RETRY_AFTER_MS: u64 = 900;
     // One resize nudge recovered only 2 of 6 stuck runs in a 60-run
     // batch (confirmed live) - raised from 2000 so a stuck combination
     // gets several nudges, not one, before this function gives up and
-    // leaves it to `measurement_script`'s own wait.
+    // defers to `run`'s own relaunch-once handling.
     const GIVE_UP_AFTER_MS: u64 = 4000;
+
     let start = std::time::Instant::now();
     let mut last_retry = start;
+    // Review 253 §1, found live measuring this very fix: an ordinary,
+    // healthy reflow regularly takes a tick or two of its own to finish
+    // - `width_changed_and_held`'s first, zero-delay read almost never
+    // catches it, so without this flag *every* zoom change reported as
+    // "recovered by re-apply" (111 of 111 across one full-matrix run,
+    // zero nudges actually fired) - counting ordinary latency as the
+    // WebKitGTK race it exists to measure. `nudged` is only set once a
+    // nudge actually fires below, so "recovered by re-apply" now means
+    // exactly that - never a tick or two of normal settling.
+    let mut nudged = false;
     loop {
-        let w = read_client_width().await;
-        if w != before_width {
-            return;
+        if width_changed_and_held(before_width).await {
+            return if nudged {
+                ZoomOutcome::RecoveredByReapply
+            } else {
+                ZoomOutcome::Verified
+            };
         }
         let elapsed = start.elapsed();
         if elapsed >= std::time::Duration::from_millis(GIVE_UP_AFTER_MS) {
-            // Leaves it to `measurement_script`'s own `waitForZoomChange`
-            // to report the probe error, with its own full timeout - not
-            // reported here, so a combination that recovers on its own
-            // after this function gives up still measures normally.
-            return;
+            return ZoomOutcome::StillStuck;
         }
         if last_retry.elapsed() >= std::time::Duration::from_millis(RETRY_AFTER_MS) {
             eprintln!(
@@ -1247,9 +1354,61 @@ async fn apply_zoom_with_retry(
                     .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w, h));
             }
             desktop.set_zoom_level(zoom);
+            nudged = true;
             last_retry = std::time::Instant::now();
         }
         tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+    }
+}
+
+/// How long a changed width must persist, across two reads, before
+/// [`width_changed_and_held`] accepts it — long enough to outlast a
+/// single frame's worth of resize jitter from [`verify_zoom`]'s own
+/// nudge, short enough not to mistake a second stuck case for a held
+/// one. See `verify_zoom`'s own doc comment for why this exists at all.
+const HOLD_MS: u64 = 50;
+
+/// `true` only if `clientWidth` differs from `before_width` on *two*
+/// reads, [`HOLD_MS`] apart — review 253 §1's own fix for the flicker
+/// false positive; see [`verify_zoom`]'s doc comment.
+async fn width_changed_and_held(before_width: f64) -> bool {
+    let w1 = read_client_width().await;
+    if w1 == before_width {
+        return false;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(HOLD_MS)).await;
+    let w2 = read_client_width().await;
+    w2 == w1
+}
+
+/// [`verify_zoom`]'s own result — reported on the relevant row's
+/// [`ResultRow::zoom_check`] (serialized as the matching lowercase
+/// string by [`ZoomOutcome::as_str`]) so a whole run's own frequency is
+/// visible, not just logged, the same reasoning [`ResultRow::recv_retries`]
+/// already carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ZoomOutcome {
+    /// Changed and held before any nudge fired — ordinary reflow
+    /// latency (often a tick or two of [`verify_zoom`]'s own poll), not
+    /// the WebKitGTK race this module exists to catch.
+    Verified,
+    /// At least one nudge actually fired (`eprintln!("...nudging via a
+    /// window resize"...)`), and recovered within this launch's own
+    /// [`GIVE_UP_AFTER_MS`](verify_zoom) budget afterward.
+    RecoveredByReapply,
+    /// Still stuck when the budget ran out. `run`'s own caller must not
+    /// measure anything under this `(view, text_size)` pair in this
+    /// launch — `xtask` relaunches once for it instead (review 253 §1).
+    StillStuck,
+}
+
+impl ZoomOutcome {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Verified => "verified",
+            Self::RecoveredByReapply => "recovered_by_reapply",
+            Self::StillStuck => "needs_relaunch",
+        }
     }
 }
 

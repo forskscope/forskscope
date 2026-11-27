@@ -267,6 +267,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
 
     let mut all_rows: Vec<serde_json::Value> = Vec::new();
     let mut per_window_ms: Vec<(String, u128)> = Vec::new();
+    let mut zoom_counts = ZoomCounts::default();
 
     for &window_label in DEFAULT_WINDOWS {
         let plan_path = out_dir.join(format!("plan-layout-{window_label}.json"));
@@ -283,17 +284,19 @@ pub fn run(root: &Path, opts: &RunOptions) {
         );
 
         println!("layout-check: running layout checks, window {window_label}...");
-        let elapsed = launch_and_wait(
+        let (elapsed, rows) = launch_and_wait_with_zoom_relaunch(
             &bin,
             &plan_path,
             &data_dir,
             &bus_conf,
             &display,
             &fixtures.deep_path,
+            &results_path,
+            &mut zoom_counts,
         );
         per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
 
-        for row in read_jsonl(&results_path) {
+        for row in rows {
             all_rows.push(row);
         }
     }
@@ -315,25 +318,27 @@ pub fn run(root: &Path, opts: &RunOptions) {
         println!(
             "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
         );
-        let elapsed = launch_and_wait(
+        let (elapsed, rows) = launch_and_wait_with_zoom_relaunch(
             &bin,
             &plan_path,
             &data_dir,
             &bus_conf,
             &display,
             &fixtures.deep_path,
+            &results_path,
+            &mut zoom_counts,
         );
         per_window_ms.push((
             format!("contrast {window_label}@{text_size}%"),
             elapsed.as_millis(),
         ));
 
-        for row in read_jsonl(&results_path) {
+        for row in rows {
             all_rows.push(row);
         }
     }
 
-    let (any_failures, failing_rows) = report(&all_rows, &per_window_ms);
+    let (any_failures, failing_rows) = report(&all_rows, &per_window_ms, &zoom_counts);
     if !failing_rows.is_empty() {
         capture_failures(
             &out_dir,
@@ -1109,6 +1114,124 @@ fn launch_and_wait(
     start.elapsed()
 }
 
+/// Review 253 §1 (handoff 125 round 2): run-wide totals for
+/// `layout_probe::ZoomOutcome`, summed the same way `report`'s own
+/// `total_recv_retries` is - visible on every run, not just a failing
+/// one, so the gate keeps measuring how often this race fires even once
+/// it stops being a failure.
+#[derive(Default)]
+struct ZoomCounts {
+    stuck: u64,
+    recovered_by_reapply: u64,
+    recovered_by_relaunch: u64,
+}
+
+/// Adds one launch's own rows into `counts` - `"recovered_by_reapply"`
+/// counts as stuck-then-recovered; `"needs_relaunch"` counts as stuck,
+/// pending [`launch_and_wait_with_zoom_relaunch`]'s own resolution.
+/// `"verified"` (held on the first read) isn't stuck at all, and isn't
+/// counted.
+fn count_zoom_outcomes(rows: &[serde_json::Value], counts: &mut ZoomCounts) {
+    for row in rows {
+        match row.get("zoom_check").and_then(|v| v.as_str()) {
+            Some("recovered_by_reapply") => {
+                counts.stuck += 1;
+                counts.recovered_by_reapply += 1;
+            }
+            Some("needs_relaunch") => counts.stuck += 1,
+            _ => {}
+        }
+    }
+}
+
+/// [`launch_and_wait`], with review 253 §1's own "never measure at an
+/// unverified zoom" honoured one level up: if any row `layout_probe.rs`
+/// wrote carries `zoom_check: "needs_relaunch"` (its own in-process
+/// nudge-and-reapply budget ran out), the *whole* plan is relaunched
+/// once, in a sibling data dir, and its rows replace this launch's own
+/// wholesale - not just the stuck `(view, text_size)` pair's rows, since
+/// every other row from the first attempt is, by definition, from the
+/// same untrustworthy process start this plan's own result file can no
+/// longer tell apart from a trustworthy one. If the relaunch's own
+/// attempt is *also* stuck (for the same pair or a different one by
+/// bad luck), its marker row stands as the final probe error - "once"
+/// means once, matching handoff 125 round 2 §2's own instruction.
+#[allow(clippy::too_many_arguments)]
+fn launch_and_wait_with_zoom_relaunch(
+    bin: &Path,
+    plan_path: &Path,
+    data_dir: &Path,
+    bus_conf: &Path,
+    display: &str,
+    explorer_dir: &Path,
+    results_path: &Path,
+    counts: &mut ZoomCounts,
+) -> (Duration, Vec<serde_json::Value>) {
+    let mut elapsed = launch_and_wait(bin, plan_path, data_dir, bus_conf, display, explorer_dir);
+    let mut rows = read_jsonl(results_path);
+    count_zoom_outcomes(&rows, counts);
+
+    let stuck_pairs: Vec<(String, u64)> = rows
+        .iter()
+        .filter(|r| r.get("zoom_check").and_then(|v| v.as_str()) == Some("needs_relaunch"))
+        .map(|r| {
+            (
+                row_str(r, "view").to_string(),
+                row_u64(r, "text_size"),
+            )
+        })
+        .collect();
+    if stuck_pairs.is_empty() {
+        return (elapsed, rows);
+    }
+    for (view, text_size) in &stuck_pairs {
+        println!(
+            "layout-check: zoom from the {view} view at text size {text_size}% was still \
+             stuck after the in-process reapply budget - relaunching this plan once"
+        );
+    }
+
+    let relaunch_data_dir = data_dir.with_file_name(format!(
+        "{}-zoom-relaunch",
+        data_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let relaunch_elapsed = launch_and_wait(
+        bin,
+        plan_path,
+        &relaunch_data_dir,
+        bus_conf,
+        display,
+        explorer_dir,
+    );
+    elapsed += relaunch_elapsed;
+    let relaunch_rows = read_jsonl(results_path);
+    count_zoom_outcomes(&relaunch_rows, counts);
+
+    for (view, text_size) in &stuck_pairs {
+        let still_stuck = relaunch_rows.iter().any(|r| {
+            r.get("zoom_check").and_then(|v| v.as_str()) == Some("needs_relaunch")
+                && row_str(r, "view") == view
+                && row_u64(r, "text_size") == *text_size
+        });
+        if !still_stuck {
+            counts.recovered_by_relaunch += 1;
+        }
+    }
+    rows = relaunch_rows;
+    (elapsed, rows)
+}
+
+fn row_str<'a>(row: &'a serde_json::Value, key: &str) -> &'a str {
+    row.get(key).and_then(|v| v.as_str()).unwrap_or("?")
+}
+
+fn row_u64(row: &serde_json::Value, key: &str) -> u64 {
+    row.get(key).and_then(|v| v.as_u64()).unwrap_or(0)
+}
+
 // ── Capture on failure (review 220 §5) ──────────────────────────────────
 
 /// How long the probe keeps a captured combination's view open and
@@ -1531,6 +1654,7 @@ fn matches_expected(
 fn report(
     rows: &[serde_json::Value],
     per_window_ms: &[(String, u128)],
+    zoom_counts: &ZoomCounts,
 ) -> (bool, Vec<serde_json::Value>) {
     let mut failures = 0usize;
     let mut probe_ms_values: Vec<f64> = Vec::new();
@@ -1671,6 +1795,14 @@ fn report(
     // means the race it works around is still there, so the total is
     // worth seeing on every run, not just when something failed outright.
     println!("layout-check: total recv_retries across the run: {total_recv_retries}");
+    // Review 253 §1: F244's own frequency, kept visible on every run
+    // (not just a failing one) now that a stuck zoom is no longer
+    // allowed to pass silently - the same reasoning `total_recv_retries`
+    // above already carries.
+    println!(
+        "layout-check: zoom stuck {}, recovered by re-apply {}, recovered by relaunch {}",
+        zoom_counts.stuck, zoom_counts.recovered_by_reapply, zoom_counts.recovered_by_relaunch
+    );
     if !probe_ms_values.is_empty() {
         let sum: f64 = probe_ms_values.iter().sum();
         let mean = sum / probe_ms_values.len() as f64;
