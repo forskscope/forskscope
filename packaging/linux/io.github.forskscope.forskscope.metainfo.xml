@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.203.0" date="2026-11-28">
+      <description>
+        <p>Maintenance: the guide states what screen readers announce on each platform, and the release and testing tools are simpler and more reliable.</p>
+      </description>
+    </release>
     <release version="0.202.0" date="2026-11-26">
       <description>
         <p>Every screen holds longer translations, and the screenshots show the app as it is today.</p>

@@ -5,7 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.202.1] — Unreleased
+## [0.203.0] — 2026-11-28
+
+**Heard everywhere, and ready for the next runtime.**
+
+### Changed
+
+- **The guide says exactly what Windows screen readers announce,**
+  measured with the app itself: success and information notices, the
+  number of search matches, and changes to an ignore list are spoken
+  while ForskScope is the active window. The Explorer's status isn't
+  announced on Windows yet; the guide says so.
+
+### Internal
+
+- **The layout check never measures a page at a text size that didn't
+  apply,** and reports on every run how often the web engine dropped a
+  text-size change (F243).
+- **The AUR publish has one path:** releases. The recipe-fix mode,
+  which could never run between releases, is retired; a packaging-only
+  fix now ships as a patch release (F176, RFC-081 amended).
+- **A plan for the Flatpak runtime's end in September 2027** is
+  recorded, with a decision checkpoint in March 2027 (F212).
+
 
 ## [0.202.0] — 2026-11-26
 
